@@ -1,0 +1,32 @@
+diff --git a/runtime/native/meson.build b/runtime/native/meson.build
+index b12d5993..9aee1b4f 100644
+--- a/runtime/native/meson.build
++++ b/runtime/native/meson.build
+@@ -30,6 +30,10 @@ strict_fp = cpp.get_argument_syntax() == 'msvc' ? ['/fp:strict', '/std:c++20'] :
+ # Keep the first verified accelerator on the same scalar solver path as WASM.
+ # MSVC otherwise enables Bullet's SIMD solver implicitly in btScalar.h.
+ physics_args = strict_fp + ['-D__BT_DISABLE_SSE__', '-DBT_NO_PROFILE', '-DBT_THREADSAFE=0']
++# Apple clang targets also take btScalar.h's BT_USE_NEON/BT_USE_SIMD_VECTOR3 branch.
++if host_machine.system() == 'darwin'
++  physics_args += ['-U__ARM_NEON__']
++endif
+ bullet_manifest = meson.current_build_dir() / 'bullet_sources.txt'
+ bullet_list = run_command('python', '-c',
+   'from pathlib import Path; print(Path("' + bullet_manifest + '").read_text(), end="")', check: true).stdout().strip().split('\n')
+diff --git a/runtime/native/src/math/ysm_bullet_math.h b/runtime/native/src/math/ysm_bullet_math.h
+index 9b7fc9c2..2d247722 100644
+--- a/runtime/native/src/math/ysm_bullet_math.h
++++ b/runtime/native/src/math/ysm_bullet_math.h
+@@ -1,6 +1,12 @@
+ #ifndef YSM_BULLET_MATH_H
+ #define YSM_BULLET_MATH_H
+ #include <math.h>
++/* macOS 26+ SDKs leave INFINITY to <float.h> (__need_infinity_nan) when
++   __has_feature(modules) is true, e.g. strict -std=c++20; clang < 22 float.h
++   does not honour that handshake, so supply the C99 definition. */
++#ifndef INFINITY
++#define INFINITY (__builtin_inff())
++#endif
+ #include <stdint.h>
+ #include <string.h>
+ #ifdef __cplusplus
